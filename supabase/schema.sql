@@ -158,12 +158,36 @@ begin
 end;
 $$;
 
--- Let the anon (public) key call these three functions — this is what makes
+-- Deletes all operational data from all three tables, passcode-protected.
+create or replace function clear_all_data(passcode text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare stored text;
+begin
+  select passcode_hash into stored from admin_settings where id = 1;
+  if stored is null or stored <> encode(digest(passcode, 'sha256'), 'hex') then
+    raise exception 'Incorrect passcode';
+  end if;
+
+  delete from wastage_entries;
+  delete from production_entries;
+  delete from granule_issues;
+
+  return true;
+end;
+$$;
+
+-- Let the anon (public) key call these functions — this is what makes
 -- them reachable from the browser via supabase.rpc(...). The functions
 -- themselves still gate everything on the passcode.
 grant execute on function verify_admin_passcode(text) to anon, authenticated;
 grant execute on function get_admin_rates(text, text) to anon, authenticated;
 grant execute on function update_admin_settings(text, text, numeric, numeric, numeric, numeric) to anon, authenticated;
+grant execute on function clear_all_data(text) to anon, authenticated;
 
 -- Explicitly make sure the table itself stays unreachable directly.
 revoke all on admin_settings from anon, authenticated;
+

@@ -32,6 +32,13 @@ export async function updateAdminSettings(input: {
   if (error) throw new Error(error.message.includes("incorrect") ? "Current password is incorrect." : error.message);
 }
 
+export async function clearAllData(passcode: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("clear_all_data", { passcode });
+  if (error) throw new Error(error.message.includes("Incorrect passcode") ? "Incorrect passcode." : error.message);
+  return data as boolean;
+}
+
+
 /**
  * Rates come from the passcode-gated RPC; the day-by-day production numbers
  * are ordinary (non-sensitive) data the anon key can already read. Combining

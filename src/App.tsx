@@ -7,7 +7,7 @@ import {
 import { PlantKey, WastageValues, ShiftData, ProductionRow } from "./lib/types";
 import { WASTAGE_SCHEMA, PLANT_LABEL, emptyWastageValues } from "./lib/schema";
 import * as api from "./lib/api";
-import { verifyAdminPasscode, getAdminReport, updateAdminSettings } from "./lib/adminApi";
+import { verifyAdminPasscode, getAdminReport, updateAdminSettings, clearAllData } from "./lib/adminApi";
 import { downloadWastagePdf, downloadAdminPdf } from "./lib/pdf";
 import { buildWastageMessage, buildProductionMessage, buildGranulesMessage } from "./lib/whatsapp";
 
@@ -16,6 +16,18 @@ const fmt = (n: number) => Math.round(Number(n) || 0).toLocaleString("en-IN");
 const fmtMoney = (n: number) => (Number(n) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pad2 = (n: number) => String(n).padStart(2, "0");
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+const formatDisplayDate = (dateStr: string) => {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return dateStr;
+  const year = parts[0];
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const day = parts[2];
+  const monthName = MONTHS[monthIdx];
+  if (!monthName) return dateStr;
+  return `${day}-${monthName}-${year}`;
+};
 
 type Screen =
   | { name: "home" }
@@ -438,7 +450,7 @@ function DateList({ plant, push, pop, flash }: { plant: PlantKey | "granules"; p
           <div key={d} style={{ ...cardRow, cursor: "pointer" }}
             onClick={() => push(isGranules ? { name: "granulesEntry", date: d } : { name: "dateDetail", plant: plant as PlantKey, date: d })}>
             <div style={iconBox}><Calendar size={16} /></div>
-            <div style={{ fontWeight: 700, fontSize: 13.5, fontFamily: "monospace" }}>{d}</div>
+            <div style={{ fontWeight: 700, fontSize: 13.5, fontFamily: "monospace" }}>{formatDisplayDate(d)}</div>
           </div>
         ))}
       </ContentWrapper>
@@ -483,7 +495,7 @@ function DateDetail({ plant, date, push, pop }: { plant: PlantKey; date: string;
 
   return (
     <div>
-      <TopBar title={PLANT_LABEL[plant]} subtitle={date} onBack={pop} />
+      <TopBar title={PLANT_LABEL[plant]} subtitle={formatDisplayDate(date)} onBack={pop} />
       {loading ? <Loading /> : (
         <ContentWrapper maxWidth={600} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <button onClick={() => push({ name: "wastageEntry", plant, date })} style={cardRow}>
@@ -562,7 +574,7 @@ function WastageEntry({ plant, date, pop, flash, copyToClipboard }: {
 
   return (
     <div>
-      <TopBar title="Wastage report" subtitle={`${PLANT_LABEL[plant]} · ${date}`} onBack={pop} onCopy={total > 0 ? onCopy : undefined} />
+      <TopBar title="Wastage report" subtitle={`${PLANT_LABEL[plant]} · ${formatDisplayDate(date)}`} onBack={pop} onCopy={total > 0 ? onCopy : undefined} />
       <ContentWrapper maxWidth={700}>
         <div style={totalBanner}><span>Total wastage</span><span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15 }}>{fmt(total)} kg</span></div>
 
@@ -672,7 +684,7 @@ function ProductionEntry({ plant, date, pop, flash, copyToClipboard }: {
 
   return (
     <div>
-      <TopBar title="Production report" subtitle={`${PLANT_LABEL[plant]} · ${date}`} onBack={pop} onCopy={grandTotal > 0 ? onCopy : undefined} />
+      <TopBar title="Production report" subtitle={`${PLANT_LABEL[plant]} · ${formatDisplayDate(date)}`} onBack={pop} onCopy={grandTotal > 0 ? onCopy : undefined} />
       <ContentWrapper maxWidth={700}>
         <div style={totalBanner}><span>Total production (both shifts)</span><span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15 }}>{fmt(grandTotal)} kg</span></div>
 
@@ -761,7 +773,7 @@ function GranulesEntry({ date, pop, flash, copyToClipboard }: { date: string; po
 
   return (
     <div>
-      <TopBar title="Granules issue" subtitle={date} onBack={pop} onCopy={total > 0 ? onCopy : undefined} />
+      <TopBar title="Granules issue" subtitle={formatDisplayDate(date)} onBack={pop} onCopy={total > 0 ? onCopy : undefined} />
       <ContentWrapper maxWidth={700}>
         <div style={totalBanner}><span>Total granules issued</span><span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15 }}>{fmt(total)} kg</span></div>
 
@@ -866,7 +878,7 @@ function WastageReportSheet({ year, month, plant: initialPlant, pop }: { year: n
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={r.date} style={{ background: i % 2 ? "#f7f7f5" : "#fff" }}>
-                    <td style={{ ...tdStyle, position: "sticky", left: 0, background: i % 2 ? "#f7f7f5" : "#fff", fontWeight: 700 }}>{r.date.slice(8)}</td>
+                    <td style={{ ...tdStyle, position: "sticky", left: 0, background: i % 2 ? "#f7f7f5" : "#fff", fontWeight: 700 }}>{formatDisplayDate(r.date)}</td>
                     {r.deptTotals.map((v, di) => <td key={di} style={tdStyle}>{fmt(v)}</td>)}
                     <td style={{ ...tdStyle, fontWeight: 700, background: "#f0efe9" }}>{fmt(r.rowTotal)}</td>
                   </tr>
@@ -941,6 +953,25 @@ function AdminReport({ passcode, push, pop }: { passcode: string; push: (s: Scre
       .finally(() => setLoading(false));
   }, [plant, month, year]);
 
+  const handleDeleteAll = async () => {
+    const ok = window.confirm("WARNING: This will permanently delete ALL wastage entries, production entries, and granules issues from the database. This action CANNOT be undone.\n\nAre you sure you want to delete all data?");
+    if (!ok) return;
+
+    const confirmText = window.prompt("Type DELETE to confirm permanent deletion of all database records:");
+    if (confirmText !== "DELETE") {
+      alert("Deletion cancelled. Input did not match 'DELETE'.");
+      return;
+    }
+
+    try {
+      await clearAllData(passcode);
+      alert("All data has been successfully deleted.");
+      pop();
+    } catch (e: any) {
+      alert(e.message || "Failed to delete data");
+    }
+  };
+
   return (
     <div>
       <TopBar title="Admin report" subtitle={`${MONTHS[month - 1]} ${year}`} onBack={pop}
@@ -985,7 +1016,7 @@ function AdminReport({ passcode, push, pop }: { passcode: string; push: (s: Scre
                 <tbody>
                   {report.rows.map((r, i) => (
                     <tr key={r.day} style={{ background: i % 2 ? "#f7f7f5" : "#fff" }}>
-                      <td style={{ ...tdStyle, position: "sticky", left: 0, background: i % 2 ? "#f7f7f5" : "#fff", fontWeight: 700 }}>{pad2(r.day)}-{MONTHS[month - 1].slice(0, 3)}</td>
+                      <td style={{ ...tdStyle, position: "sticky", left: 0, background: i % 2 ? "#f7f7f5" : "#fff", fontWeight: 700 }}>{formatDisplayDate(`${year}-${pad2(month)}-${pad2(r.day)}`)}</td>
                       <td style={tdStyle}>{r.shiftA === null ? "—" : fmt(r.shiftA)}</td>
                       <td style={tdStyle}>{r.shiftB === null ? "—" : fmt(r.shiftB)}</td>
                       <td style={{ ...tdStyle, fontWeight: 700 }}>{fmt(r.totalProduction)}</td>
@@ -1008,8 +1039,12 @@ function AdminReport({ passcode, push, pop }: { passcode: string; push: (s: Scre
           </>
         )}
 
-        <button onClick={() => push({ name: "adminSettings", passcode })} style={{ ...addBtnGhost, width: "100%", justifyContent: "center", marginTop: 16, marginBottom: 30 }}>
+        <button onClick={() => push({ name: "adminSettings", passcode })} style={{ ...addBtnGhost, width: "100%", justifyContent: "center", marginTop: 16 }}>
           Calculation & password settings
+        </button>
+
+        <button onClick={handleDeleteAll} style={{ ...addBtnGhost, width: "100%", justifyContent: "center", marginTop: 12, marginBottom: 30, borderColor: "#dc2626", color: "#dc2626" }}>
+          Delete All Data
         </button>
       </ContentWrapper>
     </div>

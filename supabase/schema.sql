@@ -172,9 +172,10 @@ begin
     raise exception 'Incorrect passcode';
   end if;
 
-  delete from wastage_entries;
-  delete from production_entries;
-  delete from granule_issues;
+  delete from wastage_entries where id is not null;
+  delete from production_entries where id is not null;
+  delete from granule_issues where date is not null;
+
 
   return true;
 end;

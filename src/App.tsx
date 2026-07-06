@@ -30,6 +30,121 @@ type Screen =
   | { name: "adminReport"; passcode: string }
   | { name: "adminSettings"; passcode: string };
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth < 768 : false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return isMobile;
+}
+
+function ContentWrapper({ children, maxWidth = 700, style }: { children: React.ReactNode; maxWidth?: number; style?: React.CSSProperties }) {
+  const isMobile = useIsMobile();
+  return (
+    <div style={{
+      padding: isMobile ? 14 : "24px 30px",
+      maxWidth: isMobile ? undefined : maxWidth,
+      margin: isMobile ? undefined : "0 auto",
+      boxSizing: "border-box",
+      width: "100%",
+      ...style
+    }}>
+      {children}
+    </div>
+  );
+}
+
+interface SidebarProps {
+  cur: Screen;
+  push: (s: Screen) => void;
+  stack: Screen[];
+  setStack: React.Dispatch<React.SetStateAction<Screen[]>>;
+}
+
+function Sidebar({ cur, push, stack, setStack }: SidebarProps) {
+  const getActiveMenu = () => {
+    if (cur.name === "home") return "home";
+    if ("plant" in cur) {
+      if (cur.plant === "oldRp") return "oldRp";
+      if (cur.plant === "newRp") return "newRp";
+      if (cur.plant === "granules") return "granules";
+    }
+    if (cur.name === "granulesEntry") return "granules";
+    if (cur.name === "wastageReportSetup" || cur.name === "wastageReportSheet") return "wastageReport";
+    if (cur.name === "adminPasscode" || cur.name === "adminReport" || cur.name === "adminSettings") return "adminReport";
+    return "";
+  };
+
+  const activeMenu = getActiveMenu();
+
+  const handleNav = (menu: string) => {
+    if (menu === "oldRp") setStack([{ name: "home" }, { name: "dateList", plant: "oldRp" }]);
+    else if (menu === "newRp") setStack([{ name: "home" }, { name: "dateList", plant: "newRp" }]);
+    else if (menu === "granules") setStack([{ name: "home" }, { name: "dateList", plant: "granules" }]);
+    else if (menu === "wastageReport") setStack([{ name: "home" }, { name: "wastageReportSetup" }]);
+    else if (menu === "adminReport") setStack([{ name: "home" }, { name: "adminPasscode" }]);
+    else if (menu === "home") setStack([{ name: "home" }]);
+  };
+
+  return (
+    <div style={{
+      width: 280,
+      background: "#0a0a0a",
+      color: "#fff",
+      display: "flex",
+      flexDirection: "column",
+      borderRight: "1px solid #1f1f1f",
+      height: "100vh",
+      position: "sticky",
+      top: 0,
+      padding: "24px 16px",
+      boxSizing: "border-box",
+      flexShrink: 0
+    }}>
+      <div style={{ marginBottom: 32, cursor: "pointer", paddingLeft: 8 }} onClick={() => handleNav("home")}>
+        <div style={{ fontWeight: 800, fontSize: 19, letterSpacing: "0.03em", textTransform: "uppercase", color: "#fff" }}>Alliance Polysacks</div>
+        <div style={{ fontSize: 10.5, color: "#888", fontFamily: "monospace", marginTop: 4 }}>RP PLANT · DAILY REPORTING</div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+        <button onClick={() => handleNav("home")} className={`sidebar-btn ${activeMenu === "home" ? "active" : ""}`}>
+          <BarChart3 size={16} />
+          <span>Dashboard</span>
+        </button>
+        <button onClick={() => handleNav("oldRp")} className={`sidebar-btn ${activeMenu === "oldRp" ? "active" : ""}`}>
+          <Factory size={16} />
+          <span>Old RP Plant</span>
+        </button>
+        <button onClick={() => handleNav("newRp")} className={`sidebar-btn ${activeMenu === "newRp" ? "active" : ""}`}>
+          <Factory size={16} />
+          <span>New RP Plant</span>
+        </button>
+        <button onClick={() => handleNav("granules")} className={`sidebar-btn ${activeMenu === "granules" ? "active" : ""}`}>
+          <Boxes size={16} />
+          <span>Granules Issue</span>
+        </button>
+        
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#525252", margin: "18px 0 6px 12px" }}>Reports</div>
+
+        <button onClick={() => handleNav("wastageReport")} className={`sidebar-btn ${activeMenu === "wastageReport" ? "active" : ""}`}>
+          <FileText size={16} />
+          <span>Wastage Report</span>
+        </button>
+        <button onClick={() => handleNav("adminReport")} className={`sidebar-btn ${activeMenu === "adminReport" ? "active" : ""}`}>
+          <Lock size={15} style={{ marginRight: 2 }} />
+          <span>Admin Report</span>
+        </button>
+      </div>
+
+      <div style={{ fontSize: 11, color: "#444", textAlign: "center", borderTop: "1px solid #141414", paddingTop: 16 }}>
+        v1.0.0 · PWA
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [stack, setStack] = useState<Screen[]>([{ name: "home" }]);
   const [toast, setToast] = useState("");
@@ -60,15 +175,86 @@ export default function App() {
   else if (cur.name === "adminReport") body = <AdminReport passcode={cur.passcode} push={push} pop={pop} />;
   else if (cur.name === "adminSettings") body = <AdminSettings passcode={cur.passcode} pop={pop} flash={flash} />;
 
+  const isMobile = useIsMobile();
+
+  const layoutContainerStyle: React.CSSProperties = isMobile ? {
+    display: "flex",
+    flexDirection: "column",
+    minHeight: "100vh",
+    background: "#fff",
+    fontFamily: "system-ui, -apple-system, sans-serif",
+    color: "#111"
+  } : {
+    display: "flex",
+    minHeight: "100vh",
+    background: "#f7f7f5",
+    fontFamily: "system-ui, -apple-system, sans-serif",
+    color: "#111"
+  };
+
+  const workspaceStyle: React.CSSProperties = isMobile ? {
+    flex: 1,
+    position: "relative",
+    width: "100%"
+  } : {
+    flex: 1,
+    position: "relative",
+    display: "flex",
+    flexDirection: "column",
+    minHeight: "100vh",
+    background: "#fff",
+    borderLeft: "1px solid #e5e5e5"
+  };
+
   return (
-    <div style={{ display: "flex", justifyContent: "center", padding: "20px 0", background: "#f2f2f0", minHeight: "100vh" }}>
-      <div style={{
-        width: 420, background: "#fff", border: "8px solid #000", borderRadius: 34,
-        overflow: "hidden", position: "relative", fontFamily: "system-ui, -apple-system, sans-serif",
-        color: "#111", minHeight: 700,
-      }}>
-        <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 120, height: 20, background: "#000", borderRadius: "0 0 12px 12px", zIndex: 5 }} />
-        <div style={{ maxHeight: "90vh", overflowY: "auto" }}>{body}</div>
+    <div style={layoutContainerStyle}>
+      <style>{`
+        .sidebar-btn {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          background: transparent;
+          border: none;
+          border-radius: 8px;
+          padding: 12px 16px;
+          color: #a3a3a3;
+          text-align: left;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .sidebar-btn:hover {
+          background: #1a1a1a;
+          color: #fff;
+        }
+        .sidebar-btn.active {
+          background: #262626;
+          color: #fff;
+          border: 1px solid #333;
+        }
+        .card-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          border: 1.5px solid #000;
+          border-radius: 10px;
+          padding: 16px 14px;
+          background: #fff;
+          text-align: left;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .card-row:hover {
+          box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+          background: #fafafa;
+        }
+      `}</style>
+      {!isMobile && <Sidebar cur={cur} push={push} stack={stack} setStack={setStack} />}
+      <div style={workspaceStyle}>
+        <div style={{ flex: 1 }}>{body}</div>
         <Toast msg={toast} />
       </div>
     </div>
@@ -123,49 +309,61 @@ function Loading() {
 /* ================= Home ================= */
 
 function Home({ push }: { push: (s: Screen) => void }) {
+  const isMobile = useIsMobile();
   return (
     <div>
-      <TopBar title="Alliance Polysacks" subtitle="RP PLANT · DAILY REPORTING" />
-      <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-        {(["oldRp", "newRp"] as const).map((p) => (
-          <button key={p} onClick={() => push({ name: "dateList", plant: p })} style={cardRow}>
-            <div style={iconBox}><Factory size={18} /></div>
+      {isMobile && <TopBar title="Alliance Polysacks" subtitle="RP PLANT · DAILY REPORTING" />}
+      <ContentWrapper maxWidth={800} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {!isMobile && (
+          <div style={{ marginBottom: 12 }}>
+            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: "#111" }}>RP Plant Daily Reporting</h1>
+            <p style={{ margin: "4px 0 0", color: "#666", fontSize: 14.5 }}>Log daily data and view reports for Old and New RP Plants.</p>
+          </div>
+        )}
+
+        <div style={isMobile ? { display: "flex", flexDirection: "column", gap: 10 } : { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          {(["oldRp", "newRp"] as const).map((p) => (
+            <button key={p} onClick={() => push({ name: "dateList", plant: p })} className="card-row">
+              <div style={iconBox}><Factory size={18} /></div>
+              <div style={{ flex: 1, textAlign: "left" }}>
+                <div style={{ fontWeight: 700, fontSize: 14.5 }}>{PLANT_LABEL[p]}</div>
+                <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>Wastage & production entries</div>
+              </div>
+              <ChevronRight size={18} color="#999" />
+            </button>
+          ))}
+          <button onClick={() => push({ name: "dateList", plant: "granules" })} className="card-row">
+            <div style={iconBox}><Boxes size={18} /></div>
             <div style={{ flex: 1, textAlign: "left" }}>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>{PLANT_LABEL[p]}</div>
-              <div style={{ fontSize: 11.5, color: "#666" }}>Wastage & production entries</div>
+              <div style={{ fontWeight: 700, fontSize: 14.5 }}>Granules Issue</div>
+              <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>Daily material issued</div>
             </div>
             <ChevronRight size={18} color="#999" />
           </button>
-        ))}
-        <button onClick={() => push({ name: "dateList", plant: "granules" })} style={cardRow}>
-          <div style={iconBox}><Boxes size={18} /></div>
-          <div style={{ flex: 1, textAlign: "left" }}>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>Granules Issue</div>
-            <div style={{ fontSize: 11.5, color: "#666" }}>Daily material issued</div>
-          </div>
-          <ChevronRight size={18} color="#999" />
-        </button>
+        </div>
 
-        <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#888", margin: "10px 0 0" }}>Reports</div>
+        <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#888", margin: "14px 0 0" }}>Reports</div>
 
-        <button onClick={() => push({ name: "wastageReportSetup" })} style={cardRow}>
-          <div style={iconBox}><FileText size={18} /></div>
-          <div style={{ flex: 1, textAlign: "left" }}>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>Wastage Report</div>
-            <div style={{ fontSize: 11.5, color: "#666" }}>Month-wise, plant-wise sheet</div>
-          </div>
-          <ChevronRight size={18} color="#999" />
-        </button>
-        <button onClick={() => push({ name: "adminPasscode" })} style={cardRow}>
-          <div style={iconBox}><BarChart3 size={18} /></div>
-          <div style={{ flex: 1, textAlign: "left" }}>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>Admin Report</div>
-            <div style={{ fontSize: 11.5, color: "#666" }}>Owner-level · value & balance</div>
-          </div>
-          <Lock size={15} color="#999" style={{ marginRight: 2 }} />
-          <ChevronRight size={18} color="#999" />
-        </button>
-      </div>
+        <div style={isMobile ? { display: "flex", flexDirection: "column", gap: 10 } : { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <button onClick={() => push({ name: "wastageReportSetup" })} className="card-row">
+            <div style={iconBox}><FileText size={18} /></div>
+            <div style={{ flex: 1, textAlign: "left" }}>
+              <div style={{ fontWeight: 700, fontSize: 14.5 }}>Wastage Report</div>
+              <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>Month-wise, plant-wise sheet</div>
+            </div>
+            <ChevronRight size={18} color="#999" />
+          </button>
+          <button onClick={() => push({ name: "adminPasscode" })} className="card-row">
+            <div style={iconBox}><BarChart3 size={18} /></div>
+            <div style={{ flex: 1, textAlign: "left" }}>
+              <div style={{ fontWeight: 700, fontSize: 14.5 }}>Admin Report</div>
+              <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>Owner-level · value & balance</div>
+            </div>
+            <Lock size={15} color="#999" style={{ marginRight: 2 }} />
+            <ChevronRight size={18} color="#999" />
+          </button>
+        </div>
+      </ContentWrapper>
     </div>
   );
 }
@@ -215,7 +413,7 @@ function DateList({ plant, push, pop, flash }: { plant: PlantKey | "granules"; p
   return (
     <div style={{ position: "relative", minHeight: 420 }}>
       <TopBar title={label} onBack={pop} onSearch={() => setShowSearch((s) => !s)} />
-      <div style={{ padding: 14 }}>
+      <ContentWrapper maxWidth={600}>
         {showSearch && (
           <div style={{ border: "1px solid #000", borderRadius: 8, padding: 10, marginBottom: 12, background: "#fafafa" }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, color: "#555", marginBottom: 6, textTransform: "uppercase" }}>Search by date range</div>
@@ -243,7 +441,7 @@ function DateList({ plant, push, pop, flash }: { plant: PlantKey | "granules"; p
             <div style={{ fontWeight: 700, fontSize: 13.5, fontFamily: "monospace" }}>{d}</div>
           </div>
         ))}
-      </div>
+      </ContentWrapper>
 
       {modalOpen && (
         <div style={overlay}>
@@ -287,7 +485,7 @@ function DateDetail({ plant, date, push, pop }: { plant: PlantKey; date: string;
     <div>
       <TopBar title={PLANT_LABEL[plant]} subtitle={date} onBack={pop} />
       {loading ? <Loading /> : (
-        <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+        <ContentWrapper maxWidth={600} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <button onClick={() => push({ name: "wastageEntry", plant, date })} style={cardRow}>
             <div style={iconBox}><ClipboardList size={17} /></div>
             <div style={{ flex: 1, textAlign: "left", fontWeight: 700, fontSize: 14 }}>Wastage report</div>
@@ -298,7 +496,7 @@ function DateDetail({ plant, date, push, pop }: { plant: PlantKey; date: string;
             <div style={{ flex: 1, textAlign: "left", fontWeight: 700, fontSize: 14 }}>Production report</div>
             {productionSaved && <Stamp />}
           </button>
-        </div>
+        </ContentWrapper>
       )}
     </div>
   );
@@ -365,7 +563,7 @@ function WastageEntry({ plant, date, pop, flash, copyToClipboard }: {
   return (
     <div>
       <TopBar title="Wastage report" subtitle={`${PLANT_LABEL[plant]} · ${date}`} onBack={pop} onCopy={total > 0 ? onCopy : undefined} />
-      <div style={{ padding: 14 }}>
+      <ContentWrapper maxWidth={700}>
         <div style={totalBanner}><span>Total wastage</span><span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15 }}>{fmt(total)} kg</span></div>
 
         {schema.map((dep) => {
@@ -423,7 +621,7 @@ function WastageEntry({ plant, date, pop, flash, copyToClipboard }: {
         <button onClick={onSave} disabled={saving} style={{ ...primaryBtn, marginTop: 16, opacity: saving ? 0.6 : 1 }}>
           {saving ? "Saving…" : "Save wastage report"}
         </button>
-      </div>
+      </ContentWrapper>
     </div>
   );
 }
@@ -475,7 +673,7 @@ function ProductionEntry({ plant, date, pop, flash, copyToClipboard }: {
   return (
     <div>
       <TopBar title="Production report" subtitle={`${PLANT_LABEL[plant]} · ${date}`} onBack={pop} onCopy={grandTotal > 0 ? onCopy : undefined} />
-      <div style={{ padding: 14 }}>
+      <ContentWrapper maxWidth={700}>
         <div style={totalBanner}><span>Total production (both shifts)</span><span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15 }}>{fmt(grandTotal)} kg</span></div>
 
         <div style={{ display: "flex", gap: 8, margin: "14px 0" }}>
@@ -520,7 +718,7 @@ function ProductionEntry({ plant, date, pop, flash, copyToClipboard }: {
         <button onClick={onSave} disabled={saving} style={{ ...primaryBtn, marginTop: 16, opacity: saving ? 0.6 : 1 }}>
           {saving ? "Saving…" : "Save production report"}
         </button>
-      </div>
+      </ContentWrapper>
     </div>
   );
 }
@@ -564,7 +762,7 @@ function GranulesEntry({ date, pop, flash, copyToClipboard }: { date: string; po
   return (
     <div>
       <TopBar title="Granules issue" subtitle={date} onBack={pop} onCopy={total > 0 ? onCopy : undefined} />
-      <div style={{ padding: 14 }}>
+      <ContentWrapper maxWidth={700}>
         <div style={totalBanner}><span>Total granules issued</span><span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 15 }}>{fmt(total)} kg</span></div>
 
         <div style={notesLabel}>Material issued</div>
@@ -585,7 +783,7 @@ function GranulesEntry({ date, pop, flash, copyToClipboard }: { date: string; po
         <button onClick={onSave} disabled={saving} style={{ ...primaryBtn, marginTop: 16, opacity: saving ? 0.6 : 1 }}>
           {saving ? "Saving…" : "Save entry"}
         </button>
-      </div>
+      </ContentWrapper>
     </div>
   );
 }
@@ -599,7 +797,7 @@ function WastageReportSetup({ push, pop }: { push: (s: Screen) => void; pop: () 
   return (
     <div>
       <TopBar title="Wastage report" onBack={pop} />
-      <div style={{ padding: 14 }}>
+      <ContentWrapper maxWidth={500}>
         <div style={{ fontSize: 11.5, color: "#666", marginBottom: 14 }}>
           Pick the month to generate a department-wise wastage sheet — separate for Old and New RP Plant.
         </div>
@@ -614,7 +812,7 @@ function WastageReportSetup({ push, pop }: { push: (s: Screen) => void; pop: () 
         <button onClick={() => push({ name: "wastageReportSheet", year, month, plant: "oldRp" })} style={{ ...primaryBtn, marginTop: 20 }}>
           Generate sheet
         </button>
-      </div>
+      </ContentWrapper>
     </div>
   );
 }
@@ -644,7 +842,7 @@ function WastageReportSheet({ year, month, plant: initialPlant, pop }: { year: n
     <div>
       <TopBar title="Wastage report" subtitle={`${monthLabel} ${year}`} onBack={pop}
         onDownload={() => downloadWastagePdf(PLANT_LABEL[plant], monthLabel, year, schema, rows)} />
-      <div style={{ padding: 14 }}>
+      <ContentWrapper maxWidth={1100}>
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
           {(["oldRp", "newRp"] as const).map((p) => (
             <button key={p} onClick={() => setPlant(p)} style={{ ...shiftTab, ...(plant === p ? shiftTabActive : {}) }}>{PLANT_LABEL[p]}</button>
@@ -677,7 +875,7 @@ function WastageReportSheet({ year, month, plant: initialPlant, pop }: { year: n
             </table>
           </div>
         )}
-      </div>
+      </ContentWrapper>
     </div>
   );
 }
@@ -702,10 +900,11 @@ function AdminPasscode({ push, pop }: { push: (s: Screen) => void; pop: () => vo
     }
   };
 
+  const isMobile = useIsMobile();
   return (
     <div>
       <TopBar title="Admin report" onBack={pop} />
-      <div style={{ padding: 28, textAlign: "center" }}>
+      <ContentWrapper maxWidth={450} style={{ padding: isMobile ? 28 : "40px 30px", textAlign: "center" }}>
         <div style={{ width: 46, height: 46, border: "1.5px solid #000", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
           <Lock size={20} />
         </div>
@@ -721,7 +920,7 @@ function AdminPasscode({ push, pop }: { push: (s: Screen) => void; pop: () => vo
         <button onClick={submit} disabled={checking || code.length !== 6} style={{ ...primaryBtn, marginTop: 20, width: 160, opacity: checking || code.length !== 6 ? 0.5 : 1 }}>
           {checking ? "Checking…" : "Unlock"}
         </button>
-      </div>
+      </ContentWrapper>
     </div>
   );
 }
@@ -746,7 +945,7 @@ function AdminReport({ passcode, push, pop }: { passcode: string; push: (s: Scre
     <div>
       <TopBar title="Admin report" subtitle={`${MONTHS[month - 1]} ${year}`} onBack={pop}
         onDownload={report ? () => downloadAdminPdf(PLANT_LABEL[plant], MONTHS[month - 1], year, report.rows, report.overall, report.rate, report.dedBoth, report.dedOne) : undefined} />
-      <div style={{ padding: 14 }}>
+      <ContentWrapper maxWidth={1100}>
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
           {(["oldRp", "newRp"] as const).map((p) => (
             <button key={p} onClick={() => setPlant(p)} style={{ ...shiftTab, ...(plant === p ? shiftTabActive : {}) }}>{PLANT_LABEL[p]}</button>
@@ -812,7 +1011,7 @@ function AdminReport({ passcode, push, pop }: { passcode: string; push: (s: Scre
         <button onClick={() => push({ name: "adminSettings", passcode })} style={{ ...addBtnGhost, width: "100%", justifyContent: "center", marginTop: 16, marginBottom: 30 }}>
           Calculation & password settings
         </button>
-      </div>
+      </ContentWrapper>
     </div>
   );
 }
@@ -857,7 +1056,7 @@ function AdminSettings({ passcode, pop, flash }: { passcode: string; pop: () => 
   return (
     <div>
       <TopBar title="Admin settings" onBack={pop} />
-      <div style={{ padding: 14 }}>
+      <ContentWrapper maxWidth={700}>
         <div style={{ ...notesLabel, marginBottom: 8 }}>Calculation rules</div>
 
         <div style={plantBox}>
@@ -894,7 +1093,7 @@ function AdminSettings({ passcode, pop, flash }: { passcode: string; pop: () => 
         <input value={confirmPass} onChange={(e) => setConfirmPass(e.target.value.replace(/\D/g, "").slice(0, 6))} maxLength={6} style={{ ...settingsInput, width: "100%", marginBottom: 10 }} />
         {err && <div style={{ fontSize: 11.5, color: "#a30000", marginBottom: 10 }}>{err}</div>}
         <button onClick={savePassword} style={{ ...primaryBtn, marginBottom: 30 }}>Save new password</button>
-      </div>
+      </ContentWrapper>
     </div>
   );
 }

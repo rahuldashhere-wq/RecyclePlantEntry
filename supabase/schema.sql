@@ -88,7 +88,7 @@ create or replace function verify_admin_passcode(passcode text)
 returns boolean
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare stored text;
 begin
@@ -104,7 +104,7 @@ create or replace function get_admin_rates(passcode text, plant_key text)
 returns table(rate numeric, ded_both numeric)
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare stored text;
 begin
@@ -132,7 +132,7 @@ create or replace function update_admin_settings(
 ) returns boolean
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare stored text;
 begin
